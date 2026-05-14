@@ -32,6 +32,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { LessonContent } from "@/components/lesson/LessonContent";
 import { TableOfContents } from "@/components/lesson/TableOfContents";
 import { NotesPanel } from "@/components/lesson/NotesPanel";
+import { InterviewQuestions } from "@/components/lesson/InterviewQuestions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -188,6 +189,9 @@ export default function LessonPage() {
             className="px-8 py-8 max-w-3xl"
           >
             <LessonContent content={lesson.content} />
+            {lesson.interviewQuestions && lesson.interviewQuestions.length > 0 && (
+              <InterviewQuestions questions={lesson.interviewQuestions} />
+            )}
           </motion.div>
 
           {/* Bottom navigation */}

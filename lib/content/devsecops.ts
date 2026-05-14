@@ -119,6 +119,87 @@ echo "*.key"  >> .gitignore
 \`\`\`
 
 > **Tip:** The single highest-leverage first step is preventing secrets from ever entering version control. Everything else builds on that foundation.`,
+          interviewQuestions: [
+            {
+              question: "What is DevSecOps and how does it differ from 'security as a separate team' model?",
+              difficulty: "junior" as const,
+              answer: `**Traditional security model:** Security team reviews code and infrastructure at the END of the SDLC (shift-right). Developers throw code over the wall, security says "that's insecure, fix it," then back to the developer queue. Result: security is a bottleneck, findings are late and expensive to fix.
+
+**DevSecOps:** Security is integrated throughout the SDLC — shift-left means finding vulnerabilities earlier (when they're cheaper to fix) and making security automated (not manual):
+
+\`\`\`
+DevSecOps Pipeline:
+[Code Commit] → [SAST scan] → [SCA/dependency check] → [IaC scan] →
+[Container scan] → [DAST] → [Runtime monitoring]
+       ↑                                                       ↑
+   seconds after commit                           continuous in production
+\`\`\`
+
+**Key principles:**
+1. **Everything as code**: Security policies, compliance checks, vulnerability thresholds are code, version-controlled, and tested
+2. **Automated gates**: Security checks run automatically in CI/CD — developers get fast feedback without waiting for a security review cycle
+3. **Shared responsibility**: Developers own security in their domain, not a separate team
+4. **Metrics and SLOs**: Track MTTR for vulnerabilities like any other incident
+
+**Practical shift:** Instead of "security team reviews before release," the pipeline runs automatically: Semgrep/CodeQL for SAST, Trivy for containers, Checkov for IaC, and only pages the security team for high-confidence critical findings. 95% of findings are handled without human review.`,
+            },
+            {
+              question: "A developer accidentally commits an AWS access key to a public GitHub repository. What's your incident response?",
+              difficulty: "mid" as const,
+              answer: `**Assume compromised immediately** — GitHub indexes public repos within minutes, and bots scan for credentials continuously.
+
+**Step 1 — Revoke the credential (< 2 minutes):**
+\`\`\`bash
+# Identify the key:
+git log --all -p | grep -E "AKIA[0-9A-Z]{16}"
+
+# Revoke in AWS Console or CLI:
+aws iam delete-access-key \\
+  --access-key-id AKIAIOSFODNN7EXAMPLE \\
+  --user-name <username>
+# If you don't know which user: aws iam get-access-key-last-used --access-key-id AKIA...
+\`\`\`
+
+**Step 2 — Assess blast radius:**
+\`\`\`bash
+# What did this key have access to?
+aws iam list-user-policies --user-name <user>
+aws iam list-attached-user-policies --user-name <user>
+
+# Was it used after the commit? Check CloudTrail:
+aws cloudtrail lookup-events \\
+  --lookup-attributes AttributeKey=AccessKeyId,AttributeValue=AKIAIOSFODNN7EXAMPLE \\
+  --start-time <commit-time>
+\`\`\`
+
+**Step 3 — Remove from git history:**
+\`\`\`bash
+# git filter-repo (preferred):
+pip install git-filter-repo
+git filter-repo --path-glob "*.env" --invert-paths
+
+# After rewriting history, force push ALL branches:
+git push origin --force --all
+# Note: GitHub needs the branch to be unprotected
+\`\`\`
+
+**Step 4 — Notify and document:**
+- Notify security team
+- Create incident timeline
+- If key had access to PII/sensitive data → assess breach notification requirements
+
+**Prevention:**
+\`\`\`bash
+# Pre-commit hook using detect-secrets or gitleaks:
+pip install detect-secrets
+detect-secrets scan > .secrets.baseline  # committed to repo
+# Add pre-commit hook to run detect-secrets scan on each commit
+
+# GitHub secret scanning (enables automatic detection + revocation for some providers):
+# Settings → Security → Code Security → Secret scanning
+\`\`\``,
+            },
+          ],
         },
         {
           id: "threat-modeling",
@@ -779,6 +860,82 @@ jobs:
 \`\`\`
 
 > **Tip:** Start with \`--audit-level=critical\` in CI (so only critical findings block) and progressively tighten to \`high\` as your backlog reduces. Never start at \`low\` — alert fatigue kills adoption.`,
+          interviewQuestions: [
+            {
+              question: "Explain the difference between SAST, DAST, and SCA. When does each run in a CI/CD pipeline?",
+              difficulty: "junior" as const,
+              answer: `**SAST (Static Application Security Testing):**
+- Analyzes source code without running it
+- Finds: SQL injection patterns, XSS, hardcoded secrets, insecure crypto
+- Runs at: PR time, pre-merge (fast, seconds to minutes)
+- Tools: Semgrep, CodeQL, SonarQube, Checkmarx
+
+**SCA (Software Composition Analysis):**
+- Scans third-party dependencies/libraries for known CVEs
+- Finds: vulnerable package versions (e.g., Log4j CVE-2021-44228)
+- Runs at: PR time, daily scheduled scans (CVEs are discovered continuously)
+- Tools: Dependabot, Snyk, npm audit, Trivy (for containers)
+
+**DAST (Dynamic Application Security Testing):**
+- Tests the running application by sending malicious inputs
+- Finds: runtime vulnerabilities, auth bypasses, actual exploitable paths
+- Runs at: staging environment, post-deploy (needs a running app)
+- Tools: OWASP ZAP, Burp Suite, Nuclei
+
+**Pipeline placement:**
+\`\`\`
+[Commit] → SAST + SCA ← (fast gates, block on critical)
+[PR Merge] → Build image → Container scan (Trivy)
+[Deploy to Staging] → DAST scan (ZAP)
+[Production] → Runtime protection (WAF, RASP)
+\`\`\`
+
+**Why the order matters:** SAST at commit is cheapest (catches issues before the code even runs). DAST at staging is most accurate but slowest (requires a deployed environment). Running DAST against production is possible but risky — use a separate production-like environment.`,
+            },
+            {
+              question: "You've integrated SAST into CI/CD and it reports 300 findings. How do you triage and prioritize without blocking all development?",
+              difficulty: "mid" as const,
+              answer: `**Immediate triage strategy:**
+
+**1. Start permissive, tighten over time:**
+\`\`\`yaml
+# Week 1: Only block on CRITICAL, report others
+- name: Semgrep
+  run: semgrep --config auto --severity=ERROR --error
+  # ERROR = CRITICAL findings → fail build
+  # WARN/INFO → report but don't fail
+\`\`\`
+
+**2. Establish a baseline:**
+\`\`\`bash
+# Scan current codebase, mark ALL current findings as accepted (technical debt)
+semgrep --config auto --json > baseline.json
+# Commit baseline.json — only NEW findings since baseline fail the build
+# This prevents existing tech debt from blocking new work
+\`\`\`
+
+**3. Triage the 300 findings:**
+- **True positives critical**: Fix immediately, block
+- **True positives non-critical**: Add to sprint backlog, track as tech debt
+- **False positives**: Suppress with inline comments or rule exceptions:
+\`\`\`python
+# nosec: B105 — this is not a password, it's a config key name
+CONFIG_KEY = "password_field"  # noqa: S105
+\`\`\`
+
+**4. Prioritize by:**
+- Severity (CRITICAL > HIGH > MEDIUM > LOW)
+- Reachability (is the vulnerable code actually called in a user-facing path?)
+- CVSS score + exploitability (is there a working exploit in the wild?)
+
+**5. Track metrics:**
+- New vulnerabilities introduced per week (should trend toward 0)
+- MTTR (mean time to remediate) by severity
+- False positive rate (high FP rate = tune rules or switch tools)
+
+**Anti-pattern:** Blocking ALL 300 on day 1 → developers disable the tool or bypass it.`,
+            },
+          ],
         },
         {
           id: "dast-and-container-scanning",

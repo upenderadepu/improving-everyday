@@ -1,6 +1,12 @@
 export type LessonType = "lesson" | "lab" | "quiz" | "project" | "exercise";
 export type DifficultyLevel = "beginner" | "intermediate" | "advanced";
 
+export interface InterviewQuestion {
+  question: string;
+  answer: string;
+  difficulty?: "junior" | "mid" | "senior";
+}
+
 export interface Lesson {
   id: string;
   title: string;
@@ -10,6 +16,7 @@ export interface Lesson {
   content: string; // Markdown
   objectives?: string[];
   tags?: string[];
+  interviewQuestions?: InterviewQuestion[];
 }
 
 export interface Module {
