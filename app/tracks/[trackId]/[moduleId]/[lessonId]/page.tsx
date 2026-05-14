@@ -55,6 +55,7 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
   devsecops: ShieldCheck,
   aws: Cloud,
   "prompt-engineering": Sparkles,
+  kubernetes: Layers,
 };
 
 const LESSON_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {

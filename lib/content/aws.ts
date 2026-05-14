@@ -2419,7 +2419,764 @@ aws codepipeline put-approval-result \
     },
 
     // ─────────────────────────────────────────
-    // MODULE 7 — Monitoring, Security & Cost
+    // ─────────────────────────────────────────
+    // MODULE 7 — EKS (Elastic Kubernetes Service)
+    // ─────────────────────────────────────────
+    {
+      id: "eks-kubernetes",
+      title: "EKS — Elastic Kubernetes Service",
+      level: "advanced",
+      description: "Run production Kubernetes on AWS with EKS — the managed control plane used by Airbnb, Lyft, and thousands of enterprises.",
+      lessons: [
+        {
+          id: "eks-fundamentals",
+          title: "EKS Architecture & Setup",
+          duration: 25,
+          type: "lesson",
+          description: "Understand EKS architecture, managed node groups, Fargate, and cluster setup.",
+          objectives: [
+            "Understand EKS control plane vs. worker nodes and what AWS manages",
+            "Create an EKS cluster using eksctl and Terraform",
+            "Configure managed node groups and Fargate profiles",
+            "Connect kubectl to an EKS cluster with proper IAM authentication",
+          ],
+          content: `# EKS — Elastic Kubernetes Service
+
+## Why EKS? The Real-World Context
+
+Running Kubernetes yourself (kubeadm, kops) means managing etcd backups, control plane upgrades, API server HA, and certificates. **EKS eliminates this** by managing the control plane entirely.
+
+**Who uses EKS in production:**
+- **Airbnb**: Migrated from a custom infrastructure to EKS, running 1,000+ microservices
+- **Lyft**: Uses EKS for their entire backend, handling millions of ride requests
+- **Samsung**: Runs global IoT platform on EKS across multiple regions
+- **Robinhood**: Financial trading platform on EKS with strict latency requirements
+
+## EKS Architecture
+
+\`\`\`
+┌─────────────────────────────────────────────────────────────────┐
+│                     AWS Managed Control Plane                     │
+│  ┌──────────────┐  ┌──────────┐  ┌────────────────────────────┐ │
+│  │ kube-apiserver│  │  etcd    │  │ kube-controller-manager    │ │
+│  │ (HA, 3 AZs)  │  │ (managed)│  │ kube-scheduler             │ │
+│  └──────────────┘  └──────────┘  └────────────────────────────┘ │
+│              AWS handles: upgrades, backups, HA                   │
+└─────────────────────────────────┬───────────────────────────────┘
+                                  │ AWS VPC
+┌─────────────────────────────────▼───────────────────────────────┐
+│                        Your Worker Nodes                          │
+│  ┌─────────────────────┐    ┌────────────────────────────────┐  │
+│  │ Managed Node Group  │    │    Fargate Profile              │  │
+│  │ EC2 (you choose     │    │    (serverless pods, no nodes  │  │
+│  │  type, ASG managed  │    │     to manage)                 │  │
+│  │  by EKS)            │    └────────────────────────────────┘  │
+│  └─────────────────────┘                                         │
+│  Each node runs: kubelet, kube-proxy, containerd                  │
+└─────────────────────────────────────────────────────────────────┘
+\`\`\`
+
+**What AWS manages (you don't touch):**
+- Control plane EC2 instances
+- etcd cluster with automated backups
+- API server TLS certificates
+- Control plane scaling and HA across 3 AZs
+- Kubernetes version upgrades (you initiate, AWS executes)
+
+**What you manage:**
+- Worker nodes (EC2 type, count, AMI)
+- Node group upgrades (managed, but you trigger)
+- Add-ons (CoreDNS, kube-proxy, VPC CNI, EBS CSI driver)
+- Networking (VPC, subnets, security groups)
+- IAM roles for nodes and pods (IRSA)
+
+## Creating an EKS Cluster
+
+### Using eksctl (fastest for getting started)
+
+\`\`\`bash
+# Install eksctl:
+curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+
+# Create cluster with managed node group:
+eksctl create cluster \\
+  --name prod-cluster \\
+  --version 1.29 \\
+  --region us-east-1 \\
+  --nodegroup-name general \\
+  --node-type m5.xlarge \\
+  --nodes 3 \\
+  --nodes-min 2 \\
+  --nodes-max 10 \\
+  --managed \\
+  --asg-access \\
+  --external-dns-access \\
+  --full-ecr-access \\
+  --with-oidc        # enables IRSA (IAM Roles for Service Accounts)
+
+# Takes 15-20 minutes. Creates:
+# - VPC with public/private subnets across 3 AZs
+# - EKS control plane
+# - Managed node group
+# - Updates ~/.kube/config automatically
+\`\`\`
+
+### Using eksctl with a config file (production approach)
+
+\`\`\`yaml
+# cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: prod-cluster
+  region: us-east-1
+  version: "1.29"
+
+iam:
+  withOIDC: true  # required for IRSA
+
+vpc:
+  id: vpc-0a1b2c3d  # use existing VPC
+  subnets:
+    private:
+      us-east-1a: {id: subnet-aaa}
+      us-east-1b: {id: subnet-bbb}
+      us-east-1c: {id: subnet-ccc}
+
+managedNodeGroups:
+  - name: general
+    instanceType: m5.xlarge
+    minSize: 3
+    maxSize: 15
+    desiredCapacity: 3
+    volumeSize: 100
+    volumeType: gp3
+    privateNetworking: true   # nodes in private subnets
+    labels:
+      role: general
+    tags:
+      Environment: production
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+
+  - name: gpu-nodes
+    instanceType: g4dn.xlarge
+    minSize: 0
+    maxSize: 5
+    labels:
+      role: gpu
+      nvidia.com/gpu: "true"
+\`\`\`
+
+\`\`\`bash
+eksctl create cluster -f cluster.yaml
+\`\`\`
+
+### Using Terraform (IaC approach — production standard)
+
+\`\`\`hcl
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "prod-cluster"
+  cluster_version = "1.29"
+
+  vpc_id                         = module.vpc.vpc_id
+  subnet_ids                     = module.vpc.private_subnets
+  cluster_endpoint_public_access = true
+
+  # Add-ons managed by EKS:
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+    aws-ebs-csi-driver = {
+      most_recent = true
+    }
+  }
+
+  # Enable IRSA:
+  enable_irsa = true
+
+  eks_managed_node_groups = {
+    general = {
+      instance_types = ["m5.xlarge"]
+      min_size       = 3
+      max_size       = 15
+      desired_size   = 3
+
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 100
+            volume_type           = "gp3"
+            encrypted             = true
+            delete_on_termination = true
+          }
+        }
+      }
+    }
+  }
+}
+\`\`\`
+
+## Connecting kubectl to EKS
+
+\`\`\`bash
+# Update kubeconfig:
+aws eks update-kubeconfig \\
+  --region us-east-1 \\
+  --name prod-cluster
+
+# Verify:
+kubectl get nodes
+# NAME                          STATUS   ROLES    AGE   VERSION
+# ip-10-0-1-123.ec2.internal   Ready    <none>   5m    v1.29.0-eks-abc123
+
+# Check cluster info:
+kubectl cluster-info
+kubectl version --short
+\`\`\`
+
+## IAM Roles for Service Accounts (IRSA)
+
+**The problem:** A pod needs to write to S3. Old approach: put AWS credentials in a Secret (insecure). **IRSA solution:** Link a Kubernetes ServiceAccount to an IAM role — the pod gets temporary credentials automatically via metadata service.
+
+\`\`\`bash
+# 1. Create IAM policy:
+aws iam create-policy \\
+  --policy-name s3-write-policy \\
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::my-bucket/*"
+    }]
+  }'
+
+# 2. Create IAM role + ServiceAccount with eksctl:
+eksctl create iamserviceaccount \\
+  --name s3-writer \\
+  --namespace production \\
+  --cluster prod-cluster \\
+  --attach-policy-arn arn:aws:iam::123456789:policy/s3-write-policy \\
+  --approve \\
+  --region us-east-1
+
+# 3. Use the ServiceAccount in your pod:
+\`\`\`
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  template:
+    spec:
+      serviceAccountName: s3-writer  # binds to the IAM role
+      containers:
+        - name: app
+          image: my-app:latest
+          # No AWS credentials needed — SDK auto-discovers via IRSA
+\`\`\`
+
+## EKS Fargate — Serverless Kubernetes
+
+\`\`\`yaml
+# Fargate profile: pods matching these selectors run on Fargate
+# (AWS manages the underlying EC2 — you never see the nodes)
+\`\`\`
+
+\`\`\`bash
+eksctl create fargateprofile \\
+  --cluster prod-cluster \\
+  --name batch-jobs \\
+  --namespace batch \\
+  --labels type=batch
+\`\`\`
+
+**When to use Fargate:**
+- Batch jobs with variable resource needs (scale to zero when no jobs)
+- Isolating untrusted workloads (each pod gets its own microVM)
+- Compliance requirements (no shared nodes between tenants)
+- **Cost:** More expensive per-CPU than EC2, but no idle node cost
+
+## EKS Node Group Upgrades
+
+\`\`\`bash
+# Check available K8s versions:
+aws eks describe-addon-versions --query 'addons[0].addonVersions[].compatibilities[].clusterVersion' --output table
+
+# Upgrade control plane first:
+aws eks update-cluster-version \\
+  --name prod-cluster \\
+  --kubernetes-version 1.30
+
+# Wait for upgrade to complete:
+aws eks wait cluster-active --name prod-cluster
+
+# Upgrade managed node group:
+aws eks update-nodegroup-version \\
+  --cluster-name prod-cluster \\
+  --nodegroup-name general \\
+  --kubernetes-version 1.30
+
+# The node group upgrade process:
+# 1. Launches new nodes with new version
+# 2. Cordons and drains old nodes (respects PodDisruptionBudgets)
+# 3. Terminates old nodes
+# Zero-downtime when PDBs and rolling update strategy are configured
+\`\`\`
+`,
+          interviewQuestions: [
+            {
+              question: "What is the difference between EKS managed node groups and self-managed nodes? When do you use Fargate?",
+              difficulty: "mid" as const,
+              answer: `**Self-managed nodes:** You create EC2 instances manually, join them to the cluster with bootstrap scripts. You manage: AMI updates, security patches, scaling. Full control, full responsibility.
+
+**Managed node groups:** AWS creates and manages the EC2 instances. You define the configuration (instance type, size, min/max). AWS handles: node provisioning, automatic node repair, version upgrades (rolling). You still choose the instance type and manage IAM permissions.
+
+**Benefits of managed node groups:**
+- Nodes are automatically drained before termination (respects PodDisruptionBudgets)
+- Launch templates for customization
+- Automatic version upgrade with zero-downtime rolling
+- AWS-optimized AMI with containerd + kubelet preconfigured
+
+**Fargate:** Serverless — no nodes at all. Each pod runs in its own isolated microVM. AWS manages all infrastructure.
+
+**Decision matrix:**
+| | Self-managed | Managed Node Group | Fargate |
+|--|--|--|--|
+| Control | Full | High | None |
+| Ops burden | High | Medium | None |
+| GPU support | Yes | Yes | No |
+| Cost | Lowest | Low | Higher |
+| Use case | Custom AMIs, GPU | Standard workloads | Batch, isolation |
+
+**When Fargate makes sense:**
+- Batch jobs that run occasionally (pay only when running)
+- Strict multi-tenancy (no shared hosts)
+- Small teams that don't want node management
+- When workloads are variable and you need scale-to-zero
+
+**When to stick with EC2 (managed or self):**
+- GPU workloads (ML training, inference)
+- Spot instance strategies for 60-90% cost savings
+- Workloads needing specific instance types (compute-optimized, memory-optimized)
+- Stateful apps needing local NVMe storage`,
+            },
+            {
+              question: "How does IRSA (IAM Roles for Service Accounts) work? Why is it better than storing AWS credentials as Kubernetes Secrets?",
+              difficulty: "senior" as const,
+              answer: `**The old way (credentials as Secrets):**
+\`\`\`yaml
+# Dangerous — long-lived credentials stored in etcd
+apiVersion: v1
+kind: Secret
+data:
+  AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE  # base64 encoded
+  AWS_SECRET_ACCESS_KEY: abc123...
+\`\`\`
+Problems: Long-lived, must be rotated manually, can be leaked via logs/env inspection, all pods on the node share the instance profile.
+
+**IRSA — how it works:**
+1. **OIDC Provider**: EKS creates an OIDC identity provider. Each cluster has a unique OIDC URL.
+2. **Token projection**: Kubernetes projects a signed JWT into the pod as a file (\`/var/run/secrets/eks.amazonaws.com/serviceaccount/token\`)
+3. **AWS STS**: The AWS SDK calls \`sts:AssumeRoleWithWebIdentity\` using this JWT
+4. **Verification**: STS verifies the JWT with the cluster's OIDC provider
+5. **Short-lived creds**: STS returns temporary credentials (1 hour)
+6. **Auto-renewal**: AWS SDK automatically refreshes before expiry
+
+\`\`\`bash
+# The trust policy on the IAM role:
+{
+  "Effect": "Allow",
+  "Principal": {"Federated": "arn:aws:iam::123456789:oidc-provider/..."},
+  "Action": "sts:AssumeRoleWithWebIdentity",
+  "Condition": {
+    "StringEquals": {
+      "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:sub":
+        "system:serviceaccount:production:s3-writer"
+    }
+  }
+}
+\`\`\`
+
+**Why IRSA is better:**
+- Credentials expire in 1 hour (automatic)
+- Per-pod granularity (pod A gets S3 access, pod B gets DynamoDB)
+- No secrets in etcd, no secrets in environment variables
+- Auditable: CloudTrail shows exactly which pod assumed which role
+- No rotation burden — fully automated
+
+**Pro tip:** Combine with \`eks.amazonaws.com/role-arn\` annotation on the ServiceAccount, and the IRSA token is projected automatically — no code changes needed, just IAM and K8s configuration.`,
+            },
+            {
+              question: "Your EKS cluster nodes are NotReady. How do you diagnose and fix this?",
+              difficulty: "senior" as const,
+              answer: `**Step 1 — Check node status:**
+\`\`\`bash
+kubectl get nodes
+# NAME           STATUS     ROLES    AGE   VERSION
+# ip-10-0-1-1    NotReady   <none>   5m    v1.29.0
+
+kubectl describe node ip-10-0-1-1
+# Look for: Conditions section, Events at the bottom
+# Key fields: MemoryPressure, DiskPressure, PIDPressure, NetworkUnavailable
+\`\`\`
+
+**Step 2 — Check node conditions:**
+\`\`\`bash
+kubectl get node ip-10-0-1-1 -o jsonpath='{.status.conditions[*]}' | jq .
+# Common conditions:
+# NetworkUnavailable: True → VPC CNI issue
+# MemoryPressure: True → OOM, pods being evicted
+# DiskPressure: True → disk full, clean up images/logs
+# KubeletReady: Unknown → kubelet stopped reporting
+\`\`\`
+
+**Step 3 — SSH to the node and check kubelet:**
+\`\`\`bash
+# Get instance ID from node name:
+aws ec2 describe-instances \\
+  --filters "Name=private-dns-name,Values=ip-10-0-1-1.ec2.internal" \\
+  --query 'Reservations[0].Instances[0].InstanceId'
+
+# Connect via SSM (no SSH key needed on EKS nodes):
+aws ssm start-session --target i-xxx
+
+# On the node:
+systemctl status kubelet        # is kubelet running?
+journalctl -u kubelet -n 50     # kubelet logs
+
+# Check for CNI issues:
+ls /etc/cni/net.d/              # CNI config files exist?
+ls /opt/cni/bin/aws-cni         # VPC CNI binary installed?
+cat /var/log/aws-routed-eni/ipamd.log  # VPC CNI logs
+\`\`\`
+
+**Step 4 — Common root causes:**
+
+| Symptom | Root Cause | Fix |
+|---------|-----------|-----|
+| NetworkUnavailable | VPC CNI crashed/misconfigured | Restart aws-node daemonset |
+| kubelet not running | Ran out of disk (logs/images) | Clean up: docker/crictl prune |
+| MemoryPressure | Too many pods, OOMed | Scale out node group |
+| Node unreachable | Security group blocking 10250 | Add SG rule |
+| Certificate expired | Time drift | Sync NTP, rotate bootstrap token |
+
+\`\`\`bash
+# Restart VPC CNI:
+kubectl rollout restart daemonset aws-node -n kube-system
+
+# Force drain and terminate the bad node (ASG replaces it):
+kubectl drain ip-10-0-1-1 --ignore-daemonsets --delete-emptydir-data
+aws ec2 terminate-instances --instance-ids i-xxx
+# Cluster Autoscaler or ASG will provision a healthy replacement
+\`\`\``,
+            },
+          ],
+        },
+        {
+          id: "eks-networking-storage",
+          title: "EKS Networking, Load Balancing & Storage",
+          duration: 22,
+          type: "lesson",
+          description: "Master AWS Load Balancer Controller, EBS/EFS CSI drivers, and VPC networking in EKS.",
+          objectives: [
+            "Configure AWS Load Balancer Controller for ALB and NLB integration",
+            "Use EBS CSI driver for persistent storage in EKS",
+            "Implement EFS for shared ReadWriteMany storage",
+            "Understand VPC CNI and IP address management",
+          ],
+          content: `# EKS Networking, Load Balancing & Storage
+
+## AWS Load Balancer Controller
+
+The **AWS Load Balancer Controller** (formerly ALB Ingress Controller) provisions AWS ALBs and NLBs from Kubernetes Ingress and Service resources.
+
+**Why it matters:** Native Kubernetes LoadBalancer services provision a Classic Load Balancer per service (expensive, no URL routing). The AWS Load Balancer Controller provisions one ALB for all your Ingress rules — massive cost savings.
+
+\`\`\`bash
+# Install via Helm:
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \\
+  -n kube-system \\
+  --set clusterName=prod-cluster \\
+  --set serviceAccount.create=false \\
+  --set serviceAccount.name=aws-load-balancer-controller
+  # (serviceAccount pre-created with IRSA role)
+\`\`\`
+
+### ALB Ingress
+
+\`\`\`yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip   # route to pod IPs directly
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...  # HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/group.name: shared-alb  # SHARE one ALB across multiple Ingresses
+spec:
+  rules:
+    - host: api.myapp.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 3000
+    - host: admin.myapp.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-service
+                port:
+                  number: 8080
+\`\`\`
+
+### NLB for Non-HTTP Traffic
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: game-server
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: game-server
+  ports:
+    - port: 7777
+      protocol: UDP
+\`\`\`
+
+## VPC CNI and IP Address Planning
+
+EKS uses the **VPC CNI plugin** — each pod gets a real VPC IP address (not an overlay network). This is unique to AWS and has important implications:
+
+\`\`\`
+AWS VPC: 10.0.0.0/16
+
+Pod IPs come directly from your VPC subnets:
+Pod 1: 10.0.1.54    ← real VPC IP (no NAT)
+Pod 2: 10.0.2.183   ← real VPC IP
+Pod 3: 10.0.1.92    ← real VPC IP
+
+This means:
+✅ Pods accessible from anywhere in the VPC without special routing
+✅ Security groups apply directly to pods (pod-level SGs)
+❌ You need enough IP space — a /24 subnet only has 254 IPs
+\`\`\`
+
+**IP exhaustion problem and solutions:**
+
+\`\`\`bash
+# Check available IPs per subnet:
+aws ec2 describe-subnets \\
+  --subnet-ids subnet-xxx \\
+  --query 'Subnets[0].AvailableIpAddressCount'
+
+# Solution 1: Custom CIDR blocks for pods (prefix delegation)
+kubectl set env daemonset aws-node -n kube-system \\
+  ENABLE_PREFIX_DELEGATION=true \\
+  WARM_PREFIX_TARGET=1
+# Each node gets a /28 prefix (16 IPs) from the subnet, not individual IPs
+# Dramatically increases pod density per node
+
+# Solution 2: Secondary CIDR block (add 100.64.0.0/16 to VPC)
+aws ec2 associate-vpc-cidr-block \\
+  --vpc-id vpc-xxx \\
+  --cidr-block 100.64.0.0/16
+# Create subnets in this CIDR for pods only
+\`\`\`
+
+## EBS CSI Driver — Persistent Storage
+
+\`\`\`yaml
+# StorageClass for gp3 SSD (default after EBS CSI driver install)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer  # provision in same AZ as pod
+reclaimPolicy: Retain   # don't delete EBS volume when PVC deleted
+parameters:
+  type: gp3
+  encrypted: "true"
+  kmsKeyId: arn:aws:kms:...  # encrypt with your KMS key
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+spec:
+  accessModes: [ReadWriteOnce]   # EBS can only attach to ONE node
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 100Gi
+\`\`\`
+
+## EFS CSI Driver — Shared Storage
+
+EFS provides **ReadWriteMany** — multiple pods across multiple nodes can mount the same filesystem simultaneously. EBS cannot do this.
+
+\`\`\`bash
+# Create EFS filesystem:
+EFS_ID=$(aws efs create-file-system \\
+  --performance-mode generalPurpose \\
+  --throughput-mode elastic \\
+  --encrypted \\
+  --query 'FileSystemId' --output text)
+
+# Create mount targets in each AZ:
+for SUBNET in subnet-aaa subnet-bbb subnet-ccc; do
+  aws efs create-mount-target \\
+    --file-system-id \$EFS_ID \\
+    --subnet-id \$SUBNET \\
+    --security-groups sg-xxx
+done
+\`\`\`
+
+\`\`\`yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-xxxxx
+  directoryPerms: "700"
+---
+# Use case: shared ML training data mounted by multiple GPU pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: training-data
+spec:
+  accessModes: [ReadWriteMany]   # multiple pods across nodes
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 1Ti
+\`\`\`
+`,
+          interviewQuestions: [
+            {
+              question: "Your EKS pods are running out of IP addresses. How do you diagnose and fix it?",
+              difficulty: "senior" as const,
+              answer: `**Diagnosis:**
+\`\`\`bash
+# Symptom: pods stuck in Pending, event says:
+# "0/3 nodes are available: 3 Insufficient pods"
+# OR
+# CNI error: "failed to assign an IP address to container"
+
+# Check node IP capacity:
+kubectl describe node ip-10-0-1-1 | grep -A5 "Allocatable"
+# pods: 110  ← default max pods per node
+# This is limited by ENIs and IPs per ENI
+
+# Check per-node pod count:
+kubectl get pods --all-namespaces -o wide | awk '{print \$8}' | sort | uniq -c | sort -rn
+# Node with 110/110 pods → IP exhaustion on that node
+
+# Check subnet available IPs:
+aws ec2 describe-subnets --subnet-ids subnet-xxx \\
+  --query 'Subnets[0].AvailableIpAddressCount'
+\`\`\`
+
+**Understanding the limit:** Each EC2 instance type has a max number of ENIs and IPs per ENI. E.g., m5.xlarge has 4 ENIs × 15 IPs = 60 IPs → max ~58 pods (2 reserved for node).
+
+**Solutions:**
+
+**Option 1 — Scale out node group (short-term):**
+\`\`\`bash
+aws eks update-nodegroup-config \\
+  --cluster-name prod-cluster \\
+  --nodegroup-name general \\
+  --scaling-config desiredSize=10,minSize=5,maxSize=20
+\`\`\`
+
+**Option 2 — Enable prefix delegation (best long-term):**
+\`\`\`bash
+# Each node gets a /28 block (16 IPs) instead of individual IPs
+# m5.xlarge: 4 ENIs × 15 prefixes × 16 IPs = 960 possible pod IPs!
+kubectl set env daemonset aws-node -n kube-system \\
+  ENABLE_PREFIX_DELEGATION=true \\
+  WARM_PREFIX_TARGET=1
+kubectl rollout restart daemonset aws-node -n kube-system
+\`\`\`
+
+**Option 3 — Larger subnets (infrastructure change):**
+\`\`\`bash
+# /24 subnet = 254 IPs. For 100 pods with buffer, need /22 or larger
+# Add secondary CIDR: 100.64.0.0/16 to VPC (100K+ IPs)
+# Create new subnets in secondary CIDR for pods
+\`\`\`
+
+**Option 4 — Use Fargate for suitable workloads:**
+Fargate pods don't consume node IP capacity.`,
+            },
+          ],
+        },
+      ],
+    },
+
+    // ─────────────────────────────────────────
+    // MODULE 8 — Monitoring, Security & Cost
     // ─────────────────────────────────────────
     {
       id: "aws-monitoring-security",

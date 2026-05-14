@@ -49,6 +49,7 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
   devsecops: ShieldCheck,
   aws: Cloud,
   "prompt-engineering": Sparkles,
+  kubernetes: Layers,
 };
 
 function TrackCard({

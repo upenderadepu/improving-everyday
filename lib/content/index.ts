@@ -8,6 +8,7 @@ import { terraformTrack } from "./terraform";
 import { devsecopsTrack } from "./devsecops";
 import { awsTrack } from "./aws";
 import { promptEngineeringTrack } from "./prompt-engineering";
+import { kubernetesTrack } from "./kubernetes";
 import type { Track, LessonWithContext, Module, Lesson } from "./types";
 
 export * from "./types";
@@ -23,6 +24,7 @@ export const tracks: Track[] = [
   devsecopsTrack,
   awsTrack,
   promptEngineeringTrack,
+  kubernetesTrack,
 ];
 
 export function getTrack(trackId: string): Track | undefined {

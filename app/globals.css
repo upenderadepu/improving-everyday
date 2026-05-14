@@ -177,3 +177,6 @@ body {
 .track-prompt-gradient {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 100%);
 }
+.track-kubernetes-gradient {
+  background: linear-gradient(135deg, rgba(50, 108, 229, 0.12) 0%, rgba(50, 108, 229, 0.04) 100%);
+}

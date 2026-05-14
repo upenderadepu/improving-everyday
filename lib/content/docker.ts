@@ -31,6 +31,16 @@ export const dockerTrack: Track = {
           ],
           content: `# Linux Namespaces & cgroups — Docker's Foundation
 
+## Why This Matters in Real Production
+
+**Docker powers the modern internet.** Netflix runs 100,000+ containers to stream to 230 million subscribers. Spotify uses Docker to deploy their microservices 1,000+ times per day. Google processes 2 billion containers per week across their infrastructure (using Borg, the system that inspired Kubernetes).
+
+Understanding how containers work at the kernel level means you can:
+- Debug mysterious container crashes without guessing
+- Tune resource limits before they cause production outages
+- Explain to your team *why* containers behave the way they do
+- Answer deep technical interview questions with confidence
+
 Docker is not magic. It's a well-designed API over two Linux kernel features: **namespaces** (isolation) and **cgroups** (resource limits). Understanding these explains every Docker behavior you've ever found confusing.
 
 ## What is a Container?
