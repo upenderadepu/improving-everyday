@@ -13,26 +13,29 @@ import { troubleshootingTrack } from "./troubleshooting";
 import { sshProtocolsTrack } from "./ssh-protocols";
 import { scriptingTrack } from "./scripting";
 import { webTechnologyTrack } from "./web-technology";
+import { complianceTrack } from "./compliance";
 import type { Track, LessonWithContext, Module, Lesson } from "./types";
 
 export * from "./types";
 
+// Ordered beginner → advanced: foundations first, cloud/orchestration/security last
 export const tracks: Track[] = [
-  gitTrack,
-  githubActionsTrack,
-  pythonTrack,
-  dockerTrack,
-  linuxNetworkingTrack,
-  linuxTrack,
-  terraformTrack,
-  devsecopsTrack,
-  awsTrack,
-  promptEngineeringTrack,
-  kubernetesTrack,
-  troubleshootingTrack,
-  sshProtocolsTrack,
-  scriptingTrack,
-  webTechnologyTrack,
+  linuxTrack,             // 01 Foundation
+  linuxNetworkingTrack,   // 02 Foundation
+  scriptingTrack,         // 03 Foundation
+  sshProtocolsTrack,      // 04 Foundation
+  gitTrack,               // 05 Version control
+  githubActionsTrack,     // 06 CI/CD
+  pythonTrack,            // 07 Programming
+  dockerTrack,            // 08 Containers
+  webTechnologyTrack,     // 09 Web layer
+  terraformTrack,         // 10 IaC
+  awsTrack,               // 11 Cloud
+  kubernetesTrack,        // 12 Orchestration
+  devsecopsTrack,         // 13 Advanced security/ops
+  troubleshootingTrack,   // 14 Advanced debugging
+  complianceTrack,        // 15 Governance
+  promptEngineeringTrack, // 16 AI
 ];
 
 export function getTrack(trackId: string): Track | undefined {

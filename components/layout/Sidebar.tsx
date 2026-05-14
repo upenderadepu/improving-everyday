@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -71,7 +71,6 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const { activeProfile } = useProfile();
   const { isCompleted, getTrackProgress } = useProgress(activeProfile?.id ?? null);
   const [expandedTrack, setExpandedTrack] = useState<string | null>(() => {
-    // Auto-expand the track that matches the current path
     const match = pathname.match(/^\/tracks\/([^/]+)/);
     return match?.[1] ?? null;
   });
@@ -79,6 +78,25 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
     const match = pathname.match(/^\/tracks\/[^/]+\/([^/]+)/);
     return match?.[1] ?? null;
   });
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const trackRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Auto-scroll expanded track into view after animation
+  useEffect(() => {
+    if (!expandedTrack) return;
+    const el = trackRefs.current[expandedTrack];
+    const container = scrollContainerRef.current;
+    if (!el || !container) return;
+    const timer = setTimeout(() => {
+      const elBottom = el.offsetTop + el.offsetHeight;
+      const containerBottom = container.scrollTop + container.clientHeight;
+      if (elBottom > containerBottom) {
+        container.scrollTo({ top: elBottom - container.clientHeight + 16, behavior: "smooth" });
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [expandedTrack, expandedModule]);
 
   const isTrackActive = (trackId: string) => pathname.startsWith(`/tracks/${trackId}`);
 
@@ -89,7 +107,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         collapsed ? "w-0" : "w-64"
       )}
     >
-      <div className="flex-1 overflow-y-auto py-4 px-3">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-3 scroll-smooth">
         {/* Home link */}
         <Link
           href="/"
@@ -112,7 +130,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             Learning Tracks
           </p>
 
-          {tracks.map((track) => {
+          {tracks.map((track, trackIndex) => {
             const Icon = TRACK_ICONS[track.id] || BookOpen;
             const totalLessons = getTotalLessons(track);
             const { completed, percent } = getTrackProgress(track.id, totalLessons);
@@ -120,7 +138,10 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             const isActive = isTrackActive(track.id);
 
             return (
-              <div key={track.id}>
+              <div
+                key={track.id}
+                ref={(el) => { trackRefs.current[track.id] = el; }}
+              >
                 {/* Track header */}
                 <button
                   onClick={() => setExpandedTrack(isExpanded ? null : track.id)}
@@ -131,6 +152,11 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                       : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900"
                   )}
                 >
+                  {/* Track number */}
+                  <span className="text-[10px] font-mono text-zinc-700 w-5 text-right shrink-0">
+                    {String(trackIndex + 1).padStart(2, "0")}
+                  </span>
+
                   <div
                     className="h-6 w-6 rounded-md flex items-center justify-center shrink-0 transition-colors"
                     style={{
@@ -171,8 +197,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="pl-3 ml-3 border-l border-zinc-800 mt-1 space-y-0.5">
-                        {track.modules.map((module) => {
+                      <div className="pl-3 ml-8 border-l border-zinc-800 mt-1 space-y-0.5">
+                        {track.modules.map((module, moduleIndex) => {
                           const isModuleExpanded = expandedModule === module.id;
                           const isModuleActive = pathname.includes(`/tracks/${track.id}/${module.id}`);
 
@@ -193,6 +219,9 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                                     : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50"
                                 )}
                               >
+                                <span className="text-[10px] font-mono text-zinc-700 w-4 shrink-0">
+                                  {moduleIndex + 1}
+                                </span>
                                 <span className="flex-1 text-left truncate">{module.title}</span>
                                 <span className={cn("text-[10px] shrink-0", LEVEL_COLORS[module.level])}>
                                   {module.level[0].toUpperCase()}
@@ -211,12 +240,12 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                                     transition={{ duration: 0.15 }}
                                     className="overflow-hidden"
                                   >
-                                    <div className="pl-2 ml-1 border-l border-zinc-800/60 mt-0.5 space-y-0.5">
-                                      {module.lessons.map((lesson) => {
+                                    <div className="pl-2 ml-3 border-l border-zinc-800/60 mt-0.5 space-y-0.5 pb-1">
+                                      {module.lessons.map((lesson, lessonIndex) => {
                                         const LessonIcon = LESSON_TYPE_ICONS[lesson.type] || BookOpen;
                                         const lessonPath = `/tracks/${track.id}/${module.id}/${lesson.id}`;
                                         const isCurrentLesson = pathname === lessonPath;
-                                        const completed = isCompleted(track.id, module.id, lesson.id);
+                                        const done = isCompleted(track.id, module.id, lesson.id);
 
                                         return (
                                           <Link
@@ -229,16 +258,34 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                                                 : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40"
                                             )}
                                           >
-                                            {completed ? (
+                                            {done ? (
                                               <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500" />
                                             ) : (
                                               <Circle className={cn("h-3 w-3 shrink-0", isCurrentLesson ? "text-zinc-400" : "text-zinc-700")} />
                                             )}
+                                            <span className="text-[10px] font-mono text-zinc-700 shrink-0 w-4">
+                                              {lessonIndex + 1}
+                                            </span>
                                             <span className="truncate flex-1">{lesson.title}</span>
                                             <span className="text-zinc-700 shrink-0">{lesson.duration}m</span>
                                           </Link>
                                         );
                                       })}
+
+                                      {/* Module exam link */}
+                                      <Link
+                                        href={`/tracks/${track.id}/${module.id}/exam`}
+                                        className={cn(
+                                          "flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] transition-colors",
+                                          pathname === `/tracks/${track.id}/${module.id}/exam`
+                                            ? "bg-amber-500/15 text-amber-300"
+                                            : "text-zinc-600 hover:text-amber-400 hover:bg-zinc-900/40"
+                                        )}
+                                      >
+                                        <Trophy className="h-3 w-3 shrink-0 text-amber-500/60" />
+                                        <span className="text-[10px] font-mono text-zinc-700 shrink-0 w-4">✦</span>
+                                        <span className="truncate flex-1 font-medium">Module Exam</span>
+                                      </Link>
                                     </div>
                                   </motion.div>
                                 )}
@@ -254,6 +301,9 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             );
           })}
         </div>
+
+        {/* Bottom padding so last item is always reachable */}
+        <div className="h-8" />
       </div>
     </nav>
   );

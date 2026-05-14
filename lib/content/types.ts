@@ -29,12 +29,19 @@ export interface Lesson {
   quizQuestions?: QuizQuestion[];
 }
 
+export interface ModuleExamQuestion {
+  question: string;
+  answer: string;
+  difficulty?: "junior" | "mid" | "senior";
+}
+
 export interface Module {
   id: string;
   title: string;
   level: DifficultyLevel;
   description: string;
   lessons: Lesson[];
+  exam?: ModuleExamQuestion[];
 }
 
 export interface Track {
