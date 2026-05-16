@@ -17,6 +17,7 @@ import { complianceTrack } from "./compliance";
 import { databasesTrack } from "./databases";
 import { sdlcTrack } from "./sdlc";
 import { golangTrack } from "./golang";
+import { gitlabCiTrack } from "./gitlab-ci";
 import type { Track, LessonWithContext, Module, Lesson } from "./types";
 
 export * from "./types";
@@ -29,19 +30,20 @@ export const tracks: Track[] = [
   sshProtocolsTrack,      // 04 Foundation
   gitTrack,               // 05 Version control
   githubActionsTrack,     // 06 CI/CD
-  pythonTrack,            // 07 Programming
-  dockerTrack,            // 08 Containers
-  databasesTrack,         // 09 Databases
-  webTechnologyTrack,     // 10 Web layer
-  sdlcTrack,              // 11 SDLC
-  golangTrack,            // 12 Go programming
-  terraformTrack,         // 13 IaC
-  awsTrack,               // 14 Cloud
-  kubernetesTrack,        // 15 Orchestration
-  devsecopsTrack,         // 16 Advanced security/ops
-  troubleshootingTrack,   // 17 Advanced debugging
-  complianceTrack,        // 18 Governance
-  promptEngineeringTrack, // 19 AI
+  gitlabCiTrack,          // 07 CI/CD (GitLab)
+  pythonTrack,            // 08 Programming
+  dockerTrack,            // 09 Containers
+  databasesTrack,         // 10 Databases
+  webTechnologyTrack,     // 11 Web layer
+  sdlcTrack,              // 12 SDLC
+  golangTrack,            // 13 Go programming
+  terraformTrack,         // 14 IaC
+  awsTrack,               // 15 Cloud
+  kubernetesTrack,        // 16 Orchestration
+  devsecopsTrack,         // 17 Advanced security/ops
+  troubleshootingTrack,   // 18 Advanced debugging
+  complianceTrack,        // 19 Governance
+  promptEngineeringTrack, // 20 AI
 ];
 
 export function getTrack(trackId: string): Track | undefined {
