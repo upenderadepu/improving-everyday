@@ -2,10 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, Menu, X, GitBranch, ChevronDown, UserPlus, Trash2, Check } from "lucide-react";
+import { Search, Menu, X, GitBranch, ChevronDown, UserPlus, Trash2, Check, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchDialog } from "./SearchDialog";
 import { useProfile } from "@/lib/hooks/useProfile";
+import { useTheme } from "@/lib/hooks/useTheme";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ export function TopNav({ onSidebarToggle, sidebarOpen }: TopNavProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const { profiles, activeProfile, setActiveProfile, createProfile, deleteProfile } = useProfile();
+  const { theme, toggleTheme } = useTheme();
 
   // Global keyboard shortcut for search
   useEffect(() => {
@@ -103,6 +105,18 @@ export function TopNav({ onSidebarToggle, sidebarOpen }: TopNavProps) {
         </button>
 
         <div className="flex-1" />
+
+        {/* Theme toggle */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={toggleTheme}
+          className="text-zinc-500 hover:text-zinc-300"
+          aria-label="Toggle theme"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
 
         {/* Profile switcher */}
         <DropdownMenu

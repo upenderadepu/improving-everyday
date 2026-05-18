@@ -24,6 +24,22 @@
   --sidebar-width: 260px;
 }
 
+/* Light theme — inverts the zinc scale so all bg-zinc-* and text-zinc-* utilities adapt */
+html.light {
+  color-scheme: light;
+  --color-zinc-950: #ffffff;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-400: #52525b;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-200: #27272a;
+  --color-zinc-100: #18181b;
+  --color-zinc-50: #09090b;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -33,8 +49,8 @@ html {
 }
 
 body {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: var(--color-zinc-950);
+  color: var(--color-zinc-50);
   font-family: var(--font-sans, ui-sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -49,11 +65,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--color-zinc-700);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--color-zinc-600);
 }
 
 /* Prose customizations for lesson content */
@@ -90,11 +106,56 @@ body {
   color: #fb923c;
 }
 
+/* Light mode prose overrides */
+html.light .prose {
+  --tw-prose-body: #3f3f46;
+  --tw-prose-headings: #09090b;
+  --tw-prose-lead: #52525b;
+  --tw-prose-links: #2563eb;
+  --tw-prose-bold: #09090b;
+  --tw-prose-counters: #71717a;
+  --tw-prose-bullets: #a1a1aa;
+  --tw-prose-hr: #e4e4e7;
+  --tw-prose-quotes: #18181b;
+  --tw-prose-quote-borders: #d4d4d8;
+  --tw-prose-captions: #71717a;
+  --tw-prose-code: #18181b;
+  --tw-prose-pre-code: #e4e4e7;
+  --tw-prose-pre-bg: #18181b;
+  --tw-prose-th-borders: #d4d4d8;
+  --tw-prose-td-borders: #e4e4e7;
+}
+
+html.light .prose pre {
+  background: #1e1e1e !important;
+  border-color: #d4d4d8;
+}
+
+html.light .prose code:not(pre code) {
+  background: #e2e8f0;
+  color: #b45309;
+  border: 1px solid #cbd5e1;
+}
+
+/* Inline code rendered via dangerouslySetInnerHTML in LessonContent uses hardcoded
+   orange classes — override text/bg for readability on the light background */
+html.light code.text-orange-300,
+html.light code.text-orange-400 {
+  color: #c2410c !important;
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
 /* Glassmorphism utility */
 .glass {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+html.light .glass {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* Gradient text */

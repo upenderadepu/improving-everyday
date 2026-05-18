@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ProfileProvider } from "@/lib/hooks/useProfile";
+import { ThemeProvider } from "@/lib/hooks/useTheme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`} data-scroll-behavior="smooth">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} data-scroll-behavior="smooth">
+      <head>
+        {/* Prevent flash of wrong theme on reload */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('devops-lms:theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="bg-zinc-950 text-zinc-100 antialiased">
-        <ProfileProvider>{children}</ProfileProvider>
+        <ThemeProvider>
+          <ProfileProvider>{children}</ProfileProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
