@@ -18,6 +18,7 @@ import { databasesTrack } from "./databases";
 import { sdlcTrack } from "./sdlc";
 import { golangTrack } from "./golang";
 import { gitlabCiTrack } from "./gitlab-ci";
+import { cybersecurityTrack } from "./cybersecurity";
 import type { Track, LessonWithContext, Module, Lesson } from "./types";
 
 export * from "./types";
@@ -44,6 +45,7 @@ export const tracks: Track[] = [
   troubleshootingTrack,   // 18 Advanced debugging
   complianceTrack,        // 19 Governance
   promptEngineeringTrack, // 20 AI
+  cybersecurityTrack,     // 21 Cybersecurity & Ethical Hacking
 ];
 
 export function getTrack(trackId: string): Track | undefined {

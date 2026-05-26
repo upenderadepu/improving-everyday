@@ -279,3 +279,7 @@ html.light .glass {
 .track-gitlab-gradient {
   background: linear-gradient(135deg, rgba(252, 109, 38, 0.12) 0%, rgba(252, 109, 38, 0.04) 100%);
 }
+
+.track-cybersecurity-gradient {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%);
+}
