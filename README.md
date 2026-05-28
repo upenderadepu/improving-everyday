@@ -1,20 +1,20 @@
 # DevOps Learn
 
-A modern, self-paced learning platform for DevOps engineers. 20 structured tracks covering Linux, cloud, containers, CI/CD, security, and more — all running locally in the browser with no backend required.
+A self-paced DevOps learning platform with 20 tracks covering Linux, cloud, containers, CI/CD, security, and more. Everything runs locally in the browser with no backend required.
 
 ---
 
 ## Features
 
 - **20 learning tracks** organized from beginner to advanced, with modules and individual lessons
-- **Progress tracking** — lesson completion state saved automatically per profile
-- **Profile system** — create multiple learner profiles, each with their own progress
-- **Module exams** — quiz-style assessments at the end of each module
-- **Notes** — attach personal notes to any lesson
-- **Full-text search** — search across all 20 tracks, modules, and lessons instantly
-- **Light / Dark mode** — toggle between themes from the top nav bar
-- **Lesson navigation** — prev/next lesson links within a track, breadcrumb navigation
-- **No backend required** — all data is stored in your browser (localStorage)
+- **Progress tracking**: Lesson completion state is saved automatically in your browser profile
+- **Profile system**: Support for multiple learner profiles, each with independent progress tracking
+- **Module exams**: Quiz-style assessments to test your knowledge at the end of each module
+- **Notes**: Ability to attach personal study notes to any lesson
+- **Full-text search**: Instant search across all 20 tracks, modules, and lessons
+- **Light / Dark mode**: Easy theme toggling from the top navigation bar
+- **Lesson navigation**: Previous/next links within a track and breadcrumb navigation
+- **No backend required**: All data is saved locally using browser localStorage
 
 ---
 
@@ -64,9 +64,9 @@ A modern, self-paced learning platform for DevOps engineers. 20 structured track
 
 Before you start, make sure you have the following installed on your computer:
 
-- **Node.js v18 or higher** — download from [nodejs.org](https://nodejs.org). Choose the "LTS" version if you're unsure.
+- **Node.js v18 or higher**: Download from [nodejs.org](https://nodejs.org) (LTS version is recommended)
   - To check if you already have it: open a terminal and run `node -v`
-- **Git** — download from [git-scm.com](https://git-scm.com)
+- **Git**: Download from [git-scm.com](https://git-scm.com)
   - To check if you already have it: run `git --version`
 
 ### Step-by-step setup
@@ -105,7 +105,7 @@ Open your browser and go to: [http://localhost:3000](http://localhost:3000)
 
 You'll be asked to create a learner profile on first launch. Enter any name and click **Get Started**.
 
-> **Tip:** The development server has hot reload — any changes you make to the code will appear in the browser instantly without needing to restart.
+> **Tip:** The development server supports hot reloading. Any changes you make to the code will appear in the browser instantly without restarting the server.
 
 ---
 
@@ -115,9 +115,9 @@ Docker lets you run the app in a container without installing Node.js. This is t
 
 ### What you need
 
-- **Docker Desktop** — download from [docker.com](https://www.docker.com/products/docker-desktop). Install it and make sure it's running (you'll see the Docker icon in your taskbar/menu bar).
+- **Docker Desktop**: Download from [docker.com](https://www.docker.com/products/docker-desktop) and ensure it is running
 
-### Option 1 — Pull the pre-built image from GitHub Container Registry
+### Option 1: Pull the pre-built image from GitHub Container Registry
 
 If the project has been pushed to GitHub, you can pull the ready-made image directly:
 
@@ -128,7 +128,7 @@ docker run -p 3000:3000 ghcr.io/<github-username>/<repo-name>:latest
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-### Option 2 — Build the image yourself
+### Option 2: Build the image yourself
 
 If you've cloned the repository and want to build locally:
 
@@ -209,7 +209,7 @@ The app will be available at [http://localhost:3000](http://localhost:3000). The
 | [Next.js](https://nextjs.org) | React framework (App Router) |
 | TypeScript | Type-safe JavaScript |
 | Tailwind CSS | Styling |
-| localStorage | All data storage — no database needed |
+| localStorage | Client-side data storage (no external database required) |
 | React Context | State management for profiles and progress |
 | Lucide React | Icons |
 
@@ -236,7 +236,7 @@ devops-lms/
 
 Each learning track is a single TypeScript file. To add your own:
 
-1. Create `lib/content/my-topic.ts` — copy the structure from any existing file like `lib/content/linux.ts`
+1. Create `lib/content/my-topic.ts` by copying the structure of an existing track, such as `lib/content/linux.ts`
 2. Import and add it to the `tracks` array in `lib/content/index.ts`
 3. Add a gradient colour class for the track card in `app/globals.css`
 
